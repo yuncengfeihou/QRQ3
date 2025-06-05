@@ -44,9 +44,19 @@ function restoreOriginalContainers() {
             }
         } else if (wid.startsWith('JSR::')) {
             const scriptId = wid.substring(5);
-            const container = document.getElementById(`script_container_${scriptId}`);
+            let container = document.getElementById(`script_container_${scriptId}`);
+            if (!container) {
+                const allContainers = document.querySelectorAll('#qr--bar .qr--buttons');
+                allContainers.forEach(c => {
+                    if (!container && c.querySelector(`button[data-script-id="${scriptId}"]`)) {
+                        container = c;
+                    }
+                });
+            }
             if (container) {
                 container.classList.add('qrq-whitelisted-original');
+            } else {
+                console.warn(`QRQ whitelist: container for script_id ${scriptId} not found`);
             }
         }
     });
