@@ -3,7 +3,7 @@ import { sharedState } from './state.js';
 
 function resetOriginalContainers() {
     const containers = document.querySelectorAll(
-        '#qr--bar > .qr--buttons:not(#input_helper_toolbar):not(#custom_buttons_container)'
+        '#qr--bar .qr--buttons:not(#input_helper_toolbar):not(#custom_buttons_container)'
     );
     containers.forEach(c => c.classList.remove('qrq-whitelisted-original'));
 }
