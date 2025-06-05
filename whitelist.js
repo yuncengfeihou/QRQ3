@@ -65,24 +65,28 @@ export function observeBarMutations() {
         muts.forEach(m => {
             m.addedNodes.forEach(node => {
                 if (!(node instanceof HTMLElement)) return;
-                if (node.matches('.qr--buttons:not(#input_helper_toolbar):not(#custom_buttons_container)')) {
-                    const isStandard = node.dataset.isStandard === 'true';
+                const selector = '.qr--buttons:not(#input_helper_toolbar):not(#custom_buttons_container)';
+                const nodesToCheck = [];
+                if (node.matches(selector)) nodesToCheck.push(node);
+                node.querySelectorAll(selector).forEach(el => nodesToCheck.push(el));
+                nodesToCheck.forEach(el => {
+                    const isStandard = el.dataset.isStandard === 'true';
                     let id = '';
                     if (isStandard) {
-                        const setName = node.dataset.setName;
+                        const setName = el.dataset.setName;
                         id = `QRV2::${setName}`;
                     } else {
-                        const scriptId = node.dataset.scriptId;
+                        const scriptId = el.dataset.scriptId;
                         if (scriptId) id = `JSR::${scriptId}`;
                     }
                     if (id && window.extension_settings[Constants.EXTENSION_NAME]?.whitelist?.includes(id)) {
-                        node.classList.add('qrq-whitelisted-original');
+                        el.classList.add('qrq-whitelisted-original');
                     }
-                }
+                });
             });
         });
     });
-    observer.observe(bar, { childList: true });
+    observer.observe(bar, { childList: true, subtree: true });
 }
 
 window.quickReplyMenu = window.quickReplyMenu || {};
