@@ -3,7 +3,8 @@ import * as Constants from './constants.js';
 import { sharedState } from './state.js';
 import { createMenuElement } from './ui.js';
 // 从 settings.js 导入核心功能
-import { createSettingsHtml, loadAndApplySettings as loadAndApplySettingsToPanel, updateIconDisplay, saveSettings } from './settings.js';
+import { createSettingsHtml, loadAndApplySettings as loadAndApplySettingsToPanel, updateIconDisplay, saveSettings, populateWhitelistManagementUI } from './settings.js';
+import { applyWhitelistDOMChanges, observeBarMutations } from './whitelist.js';
 import { setupEventListeners, handleQuickReplyClick, updateMenuStylesUI } from './events.js';
 
 // JS-Slash-Runner 在 extension_settings 中使用的键名
@@ -23,7 +24,8 @@ if (!window.extension_settings[Constants.EXTENSION_NAME]) {
         faIconCode: '',
         globalIconSize: null,
         menuStyles: JSON.parse(JSON.stringify(Constants.DEFAULT_MENU_STYLES)),
-        savedCustomIcons: []
+        savedCustomIcons: [],
+        whitelist: []
     };
 }
 
@@ -93,12 +95,16 @@ function initializePlugin() {
         window.quickReplyMenu = {
             handleQuickReplyClick,
             saveSettings: saveSettings,
-            updateIconPreview: updateIconPreview
+            updateIconPreview: updateIconPreview,
+            applyWhitelistDOMChanges,
+            observeBarMutations
         };
 
         document.body.appendChild(menu);
         loadAndApplyInitialSettings();
         setupEventListeners();
+        applyWhitelistDOMChanges();
+        observeBarMutations();
 
         console.log(`[${Constants.EXTENSION_NAME}] Initialization complete.`);
     } catch (err) {
@@ -169,6 +175,7 @@ function performInitialization() {
     console.log(`[${Constants.EXTENSION_NAME}] Performing initialization tasks...`);
     initializePlugin();
     loadAndApplySettingsToPanel();
+    populateWhitelistManagementUI();
     pluginInitialized = true;
 }
 

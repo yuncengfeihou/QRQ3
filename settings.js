@@ -2,6 +2,7 @@
 import { extension_settings } from "./index.js";
 import * as Constants from './constants.js';
 import { sharedState } from './state.js';
+import { fetchQuickReplies } from './api.js';
 // import { updateMenuVisibilityUI } from './ui.js'; // 不再需要
 
 /**
@@ -430,6 +431,35 @@ export function createSettingsHtml() {
                            placeholder='粘贴 FontAwesome HTML, 如 <i class="fa-solid fa-house"></i>' />
                 </div>
 
+                <div class="inline-drawer">
+                    <div class="inline-drawer-toggle inline-drawer-header">
+                        <b>白名单管理</b>
+                        <div class="inline-drawer-icon fa-solid fa-circle-chevron-down"></div>
+                    </div>
+                    <div class="inline-drawer-content">
+                        <p style="font-size:small; margin-bottom:10px;">
+                            将项目移至右侧“白名单”列表，可使其在原生界面显示且不出现在 QRQ 菜单中。
+                        </p>
+                        <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px;">
+                            <div style="width: 45%;">
+                                <label for="qrq-non-whitelisted-list">在 QRQ 菜单中 (可选添加):</label>
+                                <select id="qrq-non-whitelisted-list" multiple style="width: 100%; height: 150px;"></select>
+                            </div>
+                            <div style="display: flex; flex-direction: column; gap: 10px;">
+                                <button id="qrq-add-to-whitelist-btn" class="menu_button" title="添加到白名单">&gt;</button>
+                                <button id="qrq-remove-from-whitelist-btn" class="menu_button" title="从白名单移除">&lt;</button>
+                            </div>
+                            <div style="width: 45%;">
+                                <label for="qrq-whitelisted-list">已在白名单中 (原生显示):</label>
+                                <select id="qrq-whitelisted-list" multiple style="width: 100%; height: 150px;"></select>
+                            </div>
+                        </div>
+                        <div id="qrq-whitelist-save-status"
+                             style="text-align: center; color: #4caf50; height: 20px; margin-top: 5px;">
+                        </div>
+                    </div>
+                </div>
+
                 <div style="display:flex; justify-content:space-between; margin-top:15px;">
                     <button id="${Constants.ID_MENU_STYLE_BUTTON}" class="menu_button" style="width:auto; padding:0 10px;">
                         <i class="fa-solid fa-palette"></i> 菜单样式
@@ -808,6 +838,7 @@ export function loadAndApplySettings() {
     settings.faIconCode = settings.faIconCode || '';
     settings.globalIconSize = typeof settings.globalIconSize !== 'undefined' ? settings.globalIconSize : null;
     settings.savedCustomIcons = Array.isArray(settings.savedCustomIcons) ? settings.savedCustomIcons : []; // 确保是数组
+    settings.whitelist = Array.isArray(settings.whitelist) ? settings.whitelist : [];
 
     const enabledDropdown = document.getElementById(Constants.ID_SETTINGS_ENABLED_DROPDOWN);
     if (enabledDropdown) enabledDropdown.value = String(settings.enabled);
@@ -880,6 +911,8 @@ export function loadAndApplySettings() {
         if (selectElement) selectElement.value = "";
     }
 
+    populateWhitelistManagementUI();
+    if (window.quickReplyMenu?.applyWhitelistDOMChanges) window.quickReplyMenu.applyWhitelistDOMChanges();
     console.log(`[${Constants.EXTENSION_NAME}] Settings loaded and applied to settings panel.`);
 }
 
@@ -1156,3 +1189,85 @@ function handleDeleteSavedIcon() {
         selectElement.value = "";
     }
 }
+
+export async function populateWhitelistManagementUI() {
+    const settings = extension_settings[Constants.EXTENSION_NAME];
+    const { chat, global } = fetchQuickReplies();
+    const allReplies = [...(chat || []), ...(global || [])];
+    const map = new Map();
+    allReplies.forEach(r => {
+        if (r.source === 'QuickReplyV2') {
+            const id = `QRV2::${r.setName}`;
+            if (!map.has(id)) map.set(id, { scopedId: id, displayName: `[QRv2] ${r.setName}` });
+        } else if (r.source === 'JSSlashRunner') {
+            const id = `JSR::${r.scriptId}`;
+            if (!map.has(id)) map.set(id, { scopedId: id, displayName: `[JSR] ${r.setName}` });
+        }
+    });
+
+    const nonList = document.getElementById('qrq-non-whitelisted-list');
+    const wlList = document.getElementById('qrq-whitelisted-list');
+    if (!nonList || !wlList) return;
+    nonList.innerHTML = '';
+    wlList.innerHTML = '';
+    map.forEach(({ scopedId, displayName }) => {
+        const option = document.createElement('option');
+        option.value = scopedId;
+        option.textContent = displayName;
+        if (settings.whitelist.includes(scopedId)) {
+            wlList.appendChild(option);
+        } else {
+            nonList.appendChild(option);
+        }
+    });
+}
+
+function handleAddToWhitelist() {
+    const nonList = document.getElementById('qrq-non-whitelisted-list');
+    if (!nonList) return;
+    const selected = Array.from(nonList.selectedOptions);
+    const settings = extension_settings[Constants.EXTENSION_NAME];
+    selected.forEach(opt => {
+        if (!settings.whitelist.includes(opt.value)) settings.whitelist.push(opt.value);
+    });
+    populateWhitelistManagementUI();
+    if (window.quickReplyMenu?.applyWhitelistDOMChanges) window.quickReplyMenu.applyWhitelistDOMChanges();
+    saveSettings();
+    const status = document.getElementById('qrq-whitelist-save-status');
+    if (status) {
+        status.textContent = '白名单已更新并已自动保存。';
+        status.style.color = '#4caf50';
+        setTimeout(() => { if (status.textContent.includes('已自动保存')) status.textContent = ''; }, 3000);
+    }
+}
+
+function handleRemoveFromWhitelist() {
+    const wlList = document.getElementById('qrq-whitelisted-list');
+    if (!wlList) return;
+    const selected = Array.from(wlList.selectedOptions);
+    const settings = extension_settings[Constants.EXTENSION_NAME];
+    selected.forEach(opt => {
+        const idx = settings.whitelist.indexOf(opt.value);
+        if (idx > -1) settings.whitelist.splice(idx, 1);
+    });
+    populateWhitelistManagementUI();
+    if (window.quickReplyMenu?.applyWhitelistDOMChanges) window.quickReplyMenu.applyWhitelistDOMChanges();
+    saveSettings();
+    const status = document.getElementById('qrq-whitelist-save-status');
+    if (status) {
+        status.textContent = '白名单已更新并已自动保存。';
+        status.style.color = '#4caf50';
+        setTimeout(() => { if (status.textContent.includes('已自动保存')) status.textContent = ''; }, 3000);
+    }
+}
+
+setupSettingsEventListeners = (function(orig){
+    return function(){
+        orig();
+        const addBtn = document.getElementById('qrq-add-to-whitelist-btn');
+        const rmBtn = document.getElementById('qrq-remove-from-whitelist-btn');
+        if (addBtn) addBtn.addEventListener('click', handleAddToWhitelist);
+        if (rmBtn) rmBtn.addEventListener('click', handleRemoveFromWhitelist);
+    };
+})(setupSettingsEventListeners);
+

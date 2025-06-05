@@ -5,6 +5,10 @@ body.qra-enabled #qr--bar > .qr--buttons:not(#input_helper_toolbar):not(#custom_
     display: none !important;
 }
 
+body.qra-enabled #qr--bar > .qr--buttons.qrq-whitelisted-original {
+    display: flex !important;
+}
+
 /* 插件禁用时显示原始快速回复栏 */
 body.qra-disabled #qr--bar {
     /* 恢复默认样式 */
